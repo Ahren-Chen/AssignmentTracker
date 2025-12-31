@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   AppBar,
+  Alert,
   Box,
   Button,
   Card,
@@ -9,8 +10,13 @@ import {
   Chip,
   Container,
   Divider,
+  FormControl,
   IconButton,
+  InputLabel,
+  MenuItem,
   Paper,
+  Select,
+  Snackbar,
   Stack,
   Table,
   TableBody,
@@ -18,6 +24,8 @@ import {
   TableHead,
   TableRow,
   TextField,
+  ToggleButton,
+  ToggleButtonGroup,
   Toolbar,
   Typography,
   useMediaQuery,
@@ -26,6 +34,7 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
 import DownloadIcon from "@mui/icons-material/Download";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
+import ClearIcon from "@mui/icons-material/Clear";
 
 import { DateTimePicker } from "@mui/x-date-pickers/DateTimePicker";
 import { DateTime } from "luxon";
@@ -45,16 +54,13 @@ function toGoogleCalendarUrl(a: Assignment) {
   const title = `${a.course ? `[${a.course}] ` : ""}${a.title}`.trim();
 
   // Google expects UTC timestamps in YYYYMMDDTHHMMSSZ
-  const toGCalUTC = (iso: string) => {
-    // dueISO is stored with offset; new Date(iso) will represent the correct instant
-    return new Date(iso)
+  const toGCalUTC = (iso: string) =>
+    new Date(iso)
       .toISOString()
       .replace(/[-:]/g, "")
       .replace(/\.\d{3}Z$/, "Z");
-  };
 
   const start = toGCalUTC(a.dueISO);
-  // End = +5 minutes (Google prefers start/end to exist)
   const end = toGCalUTC(new Date(new Date(a.dueISO).getTime() + 5 * 60 * 1000).toISOString());
 
   const params = new URLSearchParams({
@@ -79,15 +85,87 @@ export default function App() {
   const [due, setDue] = useState<DateTime | null>(DateTime.now().setZone(TZ));
   const [notes, setNotes] = useState("");
 
+  // validation + snackbar
+  const [titleTouched, setTitleTouched] = useState(false);
+  const [snack, setSnack] = useState<{ open: boolean; message: string }>({
+    open: false,
+    message: "",
+  });
+
+  function showError(message: string) {
+    setSnack({ open: true, message });
+  }
+
+  // filters
+  const [query, setQuery] = useState("");
+  const [courseFilter, setCourseFilter] = useState<string>("ALL");
+  const [statusFilter, setStatusFilter] = useState<"ALL" | "UPCOMING" | "OVERDUE" | "DUESOON">(
+    "ALL"
+  );
+  const [sortOrder, setSortOrder] = useState<"DUE_ASC" | "DUE_DESC">("DUE_ASC");
+
+  const courseOptions = useMemo(() => {
+    const set = new Set<string>();
+    items.forEach((i) => {
+      const c = (i.course ?? "").trim();
+      if (c) set.add(c);
+    });
+    return ["ALL", ...Array.from(set).sort((a, b) => a.localeCompare(b))];
+  }, [items]);
+
+  const filtersActive =
+    query.trim() !== "" ||
+    courseFilter !== "ALL" ||
+    statusFilter !== "ALL" ||
+    sortOrder !== "DUE_ASC";
+
+  function clearFilters() {
+    setQuery("");
+    setCourseFilter("ALL");
+    setStatusFilter("ALL");
+    setSortOrder("DUE_ASC");
+  }
+
   // load/save
   useEffect(() => setItems(loadAssignments()), []);
   useEffect(() => saveAssignments(items), [items]);
 
-  const sorted = useMemo(() => {
-    return [...items].sort(
-      (a, b) => new Date(a.dueISO).getTime() - new Date(b.dueISO).getTime()
-    );
-  }, [items]);
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const now = DateTime.now().setZone(TZ);
+
+    const matchesQuery = (a: Assignment) => {
+      if (!q) return true;
+      const hay = `${a.title} ${a.course ?? ""} ${a.notes ?? ""}`.toLowerCase();
+      return hay.includes(q);
+    };
+
+    const matchesCourse = (a: Assignment) => {
+      if (courseFilter === "ALL") return true;
+      return (a.course ?? "").trim() === courseFilter;
+    };
+
+    const matchesStatus = (a: Assignment) => {
+      if (statusFilter === "ALL") return true;
+      const dueLocal = DateTime.fromISO(a.dueISO).setZone(TZ);
+      const diffHours = dueLocal.diff(now, "hours").hours;
+
+      if (statusFilter === "OVERDUE") return diffHours < 0;
+      if (statusFilter === "DUESOON") return diffHours >= 0 && diffHours <= 48;
+      if (statusFilter === "UPCOMING") return diffHours > 48;
+      return true;
+    };
+
+    return items
+      .filter(matchesQuery)
+      .filter(matchesCourse)
+      .filter(matchesStatus)
+      .sort((a, b) => {
+        const tA = new Date(a.dueISO).getTime();
+        const tB = new Date(b.dueISO).getTime();
+        return sortOrder === "DUE_ASC" ? tA - tB : tB - tA;
+      });
+  }, [items, query, courseFilter, statusFilter, sortOrder]);
 
   const now = DateTime.now().setZone(TZ);
 
@@ -97,14 +175,27 @@ export default function App() {
     setTitle("");
     setDue(DateTime.now().setZone(TZ));
     setNotes("");
+    setTitleTouched(false);
   }
 
   function onSubmit() {
-    if (!title.trim()) return;
-    if (!due) return;
+    // Mark touched so field-level error shows
+    setTitleTouched(true);
 
-    const dueISO = due.setZone(TZ).toISO(); // store ISO
-    if (!dueISO) return;
+    if (!title.trim()) {
+      showError("Please enter a title.");
+      return;
+    }
+    if (!due) {
+      showError("Please choose a due date and time.");
+      return;
+    }
+
+    const dueISO = due.setZone(TZ).toISO();
+    if (!dueISO) {
+      showError("Invalid due date. Please pick again.");
+      return;
+    }
 
     if (editingId) {
       setItems((prev) =>
@@ -134,6 +225,7 @@ export default function App() {
     setTitle(a.title ?? "");
     setDue(DateTime.fromISO(a.dueISO).setZone(TZ));
     setNotes(a.notes ?? "");
+    setTitleTouched(false);
   }
 
   function remove(id: string) {
@@ -173,7 +265,6 @@ export default function App() {
             Export .ics
           </Button>
 
-          {/* On mobile: keep a compact export button */}
           <Button
             color="inherit"
             onClick={exportICS}
@@ -186,20 +277,11 @@ export default function App() {
       </AppBar>
 
       <Container maxWidth="md" sx={{ py: { xs: 2, sm: 4 } }}>
-        {/* Form card centered */}
-        <Paper
-          sx={{
-            p: { xs: 2, sm: 3 },
-            mx: "auto",
-            maxWidth: 720,
-            borderRadius: 3,
-          }}
-        >
+        {/* Form */}
+        <Paper sx={{ p: { xs: 2, sm: 3 }, mx: "auto", maxWidth: 720, borderRadius: 3 }}>
           <Stack spacing={2}>
             <Stack direction="row" justifyContent="space-between" alignItems="center">
-              <Typography variant="h6">
-                {editingId ? "Edit assignment" : "Add assignment"}
-              </Typography>
+              <Typography variant="h6">{editingId ? "Edit assignment" : "Add assignment"}</Typography>
               {items.length > 0 && (
                 <Typography variant="body2" color="text.secondary">
                   {items.length} item{items.length === 1 ? "" : "s"}
@@ -218,8 +300,11 @@ export default function App() {
                 label="Title"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
+                onBlur={() => setTitleTouched(true)}
                 fullWidth
                 required
+                error={titleTouched && !title.trim()}
+                helperText={titleTouched && !title.trim() ? "Title cannot be blank." : " "}
               />
             </Stack>
 
@@ -268,18 +353,90 @@ export default function App() {
 
         <Box sx={{ height: { xs: 14, sm: 20 } }} />
 
-        {/* Assignments list */}
+        {/* List */}
         <Paper sx={{ p: { xs: 2, sm: 3 }, borderRadius: 3 }}>
-          <Stack direction="row" alignItems="center" justifyContent="space-between">
+          <Stack
+            direction={{ xs: "column", sm: "row" }}
+            spacing={1.5}
+            alignItems={{ sm: "center" }}
+            justifyContent="space-between"
+          >
             <Typography variant="h6">Assignments</Typography>
+
+            {filtersActive && (
+              <Button
+                size="small"
+                startIcon={<ClearIcon />}
+                onClick={clearFilters}
+                sx={{ alignSelf: { xs: "flex-start", sm: "auto" } }}
+              >
+                Clear filters
+              </Button>
+            )}
           </Stack>
+
+          <Stack spacing={1.5} sx={{ mt: 1.5 }}>
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
+              <TextField
+                label="Search title/course/notes"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                fullWidth
+              />
+
+              <FormControl fullWidth>
+                <InputLabel>Course</InputLabel>
+                <Select
+                  label="Course"
+                  value={courseFilter}
+                  onChange={(e) => setCourseFilter(String(e.target.value))}
+                >
+                  {courseOptions.map((c) => (
+                    <MenuItem key={c} value={c}>
+                      {c === "ALL" ? "All courses" : c}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Stack>
+
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} alignItems={{ sm: "center" }}>
+              <ToggleButtonGroup
+                value={statusFilter}
+                exclusive
+                onChange={(_, v) => v && setStatusFilter(v)}
+                size="small"
+              >
+                <ToggleButton value="ALL">All</ToggleButton>
+                <ToggleButton value="OVERDUE">Overdue</ToggleButton>
+                <ToggleButton value="DUESOON">Due soon</ToggleButton>
+                <ToggleButton value="UPCOMING">Upcoming</ToggleButton>
+              </ToggleButtonGroup>
+
+              <ToggleButtonGroup
+                value={sortOrder}
+                exclusive
+                onChange={(_, v) => v && setSortOrder(v)}
+                size="small"
+                sx={{ ml: { sm: "auto" } }}
+              >
+                <ToggleButton value="DUE_ASC">Soonest</ToggleButton>
+                <ToggleButton value="DUE_DESC">Latest</ToggleButton>
+              </ToggleButtonGroup>
+            </Stack>
+          </Stack>
+
           <Divider sx={{ my: 1.5 }} />
 
-          {sorted.length === 0 ? (
+          {items.length === 0 ? (
             <Typography color="text.secondary">No assignments yet.</Typography>
+          ) : filtered.length === 0 ? (
+            <Typography color="text.secondary">
+              No results. Try clearing filters or changing your search.
+            </Typography>
           ) : isMobile ? (
             <Stack spacing={1.5}>
-              {sorted.map((a) => {
+              {filtered.map((a) => {
                 const dueLocal = DateTime.fromISO(a.dueISO).setZone(TZ);
                 return (
                   <Card key={a.id} variant="outlined" sx={{ borderRadius: 3 }}>
@@ -311,7 +468,9 @@ export default function App() {
                       <Button
                         size="small"
                         endIcon={<OpenInNewIcon />}
-                        onClick={() => window.open(toGoogleCalendarUrl(a), "_blank", "noopener,noreferrer")}
+                        onClick={() =>
+                          window.open(toGoogleCalendarUrl(a), "_blank", "noopener,noreferrer")
+                        }
                       >
                         Add to Google
                       </Button>
@@ -342,7 +501,7 @@ export default function App() {
               </TableHead>
 
               <TableBody>
-                {sorted.map((a) => {
+                {filtered.map((a) => {
                   const dueLocal = DateTime.fromISO(a.dueISO).setZone(TZ);
                   return (
                     <TableRow key={a.id}>
@@ -369,7 +528,9 @@ export default function App() {
                         <Button
                           size="small"
                           endIcon={<OpenInNewIcon />}
-                          onClick={() => window.open(toGoogleCalendarUrl(a), "_blank", "noopener,noreferrer")}
+                          onClick={() =>
+                            window.open(toGoogleCalendarUrl(a), "_blank", "noopener,noreferrer")
+                          }
                           sx={{ mr: 1 }}
                         >
                           Add to Google
@@ -389,6 +550,23 @@ export default function App() {
           )}
         </Paper>
       </Container>
+
+      {/* Error popup */}
+      <Snackbar
+        open={snack.open}
+        autoHideDuration={3000}
+        onClose={() => setSnack((s) => ({ ...s, open: false }))}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <Alert
+          severity="error"
+          variant="filled"
+          onClose={() => setSnack((s) => ({ ...s, open: false }))}
+          sx={{ width: "100%" }}
+        >
+          {snack.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }
