@@ -1,47 +1,29 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  AppBar,
   Alert,
+  AppBar,
   Box,
   Button,
-  Card,
-  CardActions,
-  CardContent,
   Chip,
   Container,
   Divider,
-  FormControl,
-  IconButton,
-  InputLabel,
-  MenuItem,
   Paper,
-  Select,
   Snackbar,
-  Stack,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableRow,
-  TextField,
-  ToggleButton,
-  ToggleButtonGroup,
   Toolbar,
   Typography,
   useMediaQuery,
 } from "@mui/material";
-import DeleteIcon from "@mui/icons-material/Delete";
-import EditIcon from "@mui/icons-material/Edit";
 import DownloadIcon from "@mui/icons-material/Download";
-import OpenInNewIcon from "@mui/icons-material/OpenInNew";
-import ClearIcon from "@mui/icons-material/Clear";
-
-import { DateTimePicker } from "@mui/x-date-pickers/DateTimePicker";
 import { DateTime } from "luxon";
 
 import type { Assignment } from "./types";
 import { loadAssignments, saveAssignments } from "./lib/storage";
 import { buildICS, downloadICS } from "./lib/ics";
+
+import AssignmentForm from "./components/AssignmentForm";
+import AssignmentFilters from "./components/AssignmentFilters";
+import type { SortOrder, StatusFilter } from "./components/AssignmentFilters";
+import AssignmentList from "./components/AssignmentList";
 
 const TZ = "America/Toronto";
 
@@ -49,11 +31,9 @@ function uid() {
   return crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random());
 }
 
-// Google Calendar “Create event” link (works well on mobile + desktop)
 function toGoogleCalendarUrl(a: Assignment) {
   const title = `${a.course ? `[${a.course}] ` : ""}${a.title}`.trim();
 
-  // Google expects UTC timestamps in YYYYMMDDTHHMMSSZ
   const toGCalUTC = (iso: string) =>
     new Date(iso)
       .toISOString()
@@ -99,10 +79,8 @@ export default function App() {
   // filters
   const [query, setQuery] = useState("");
   const [courseFilter, setCourseFilter] = useState<string>("ALL");
-  const [statusFilter, setStatusFilter] = useState<"ALL" | "UPCOMING" | "OVERDUE" | "DUESOON">(
-    "ALL"
-  );
-  const [sortOrder, setSortOrder] = useState<"DUE_ASC" | "DUE_DESC">("DUE_ASC");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
+  const [sortOrder, setSortOrder] = useState<SortOrder>("DUE_ASC");
 
   const courseOptions = useMemo(() => {
     const set = new Set<string>();
@@ -179,7 +157,6 @@ export default function App() {
   }
 
   function onSubmit() {
-    // Mark touched so field-level error shows
     setTitleTouched(true);
 
     if (!title.trim()) {
@@ -277,281 +254,57 @@ export default function App() {
       </AppBar>
 
       <Container maxWidth="md" sx={{ py: { xs: 2, sm: 4 } }}>
-        {/* Form */}
-        <Paper sx={{ p: { xs: 2, sm: 3 }, mx: "auto", maxWidth: 720, borderRadius: 3 }}>
-          <Stack spacing={2}>
-            <Stack direction="row" justifyContent="space-between" alignItems="center">
-              <Typography variant="h6">{editingId ? "Edit assignment" : "Add assignment"}</Typography>
-              {items.length > 0 && (
-                <Typography variant="body2" color="text.secondary">
-                  {items.length} item{items.length === 1 ? "" : "s"}
-                </Typography>
-              )}
-            </Stack>
-
-            <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
-              <TextField
-                label="Course (optional)"
-                value={course}
-                onChange={(e) => setCourse(e.target.value)}
-                fullWidth
-              />
-              <TextField
-                label="Title"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                onBlur={() => setTitleTouched(true)}
-                fullWidth
-                required
-                error={titleTouched && !title.trim()}
-                helperText={titleTouched && !title.trim() ? "Title cannot be blank." : " "}
-              />
-            </Stack>
-
-            <DateTimePicker
-              label="Due date & time (Toronto)"
-              value={due}
-              onChange={(v) => setDue(v)}
-              sx={{ width: "100%" }}
-            />
-
-            <TextField
-              label="Notes (optional)"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              fullWidth
-              multiline
-              minRows={2}
-            />
-
-            <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
-              <Button variant="contained" onClick={onSubmit} fullWidth={isMobile}>
-                {editingId ? "Save changes" : "Add"}
-              </Button>
-              <Button variant="outlined" onClick={resetForm} fullWidth={isMobile}>
-                Clear
-              </Button>
-              <Button
-                variant="text"
-                startIcon={<DownloadIcon />}
-                onClick={exportICS}
-                disabled={items.length === 0}
-                fullWidth={isMobile}
-              >
-                Export .ics
-              </Button>
-            </Stack>
-
-            <Box sx={{ pt: 0.5 }}>
-              <Typography variant="body2" color="text.secondary">
-                Tip: On mobile, bulk .ics import can be limited (especially Google Calendar). Use
-                “Add to Google” on each item for the smoothest mobile flow.
-              </Typography>
-            </Box>
-          </Stack>
-        </Paper>
+        <AssignmentForm
+          isMobile={isMobile}
+          itemsCount={items.length}
+          editingId={editingId}
+          course={course}
+          setCourse={setCourse}
+          title={title}
+          setTitle={setTitle}
+          due={due}
+          setDue={setDue}
+          notes={notes}
+          setNotes={setNotes}
+          titleTouched={titleTouched}
+          setTitleTouched={setTitleTouched}
+          onSubmit={onSubmit}
+          resetForm={resetForm}
+          exportICS={exportICS}
+          exportDisabled={items.length === 0}
+        />
 
         <Box sx={{ height: { xs: 14, sm: 20 } }} />
 
-        {/* List */}
         <Paper sx={{ p: { xs: 2, sm: 3 }, borderRadius: 3 }}>
-          <Stack
-            direction={{ xs: "column", sm: "row" }}
-            spacing={1.5}
-            alignItems={{ sm: "center" }}
-            justifyContent="space-between"
-          >
-            <Typography variant="h6">Assignments</Typography>
-
-            {filtersActive && (
-              <Button
-                size="small"
-                startIcon={<ClearIcon />}
-                onClick={clearFilters}
-                sx={{ alignSelf: { xs: "flex-start", sm: "auto" } }}
-              >
-                Clear filters
-              </Button>
-            )}
-          </Stack>
-
-          <Stack spacing={1.5} sx={{ mt: 1.5 }}>
-            <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
-              <TextField
-                label="Search title/course/notes"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                fullWidth
-              />
-
-              <FormControl fullWidth>
-                <InputLabel>Course</InputLabel>
-                <Select
-                  label="Course"
-                  value={courseFilter}
-                  onChange={(e) => setCourseFilter(String(e.target.value))}
-                >
-                  {courseOptions.map((c) => (
-                    <MenuItem key={c} value={c}>
-                      {c === "ALL" ? "All courses" : c}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Stack>
-
-            <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} alignItems={{ sm: "center" }}>
-              <ToggleButtonGroup
-                value={statusFilter}
-                exclusive
-                onChange={(_, v) => v && setStatusFilter(v)}
-                size="small"
-              >
-                <ToggleButton value="ALL">All</ToggleButton>
-                <ToggleButton value="OVERDUE">Overdue</ToggleButton>
-                <ToggleButton value="DUESOON">Due soon</ToggleButton>
-                <ToggleButton value="UPCOMING">Upcoming</ToggleButton>
-              </ToggleButtonGroup>
-
-              <ToggleButtonGroup
-                value={sortOrder}
-                exclusive
-                onChange={(_, v) => v && setSortOrder(v)}
-                size="small"
-                sx={{ ml: { sm: "auto" } }}
-              >
-                <ToggleButton value="DUE_ASC">Soonest</ToggleButton>
-                <ToggleButton value="DUE_DESC">Latest</ToggleButton>
-              </ToggleButtonGroup>
-            </Stack>
-          </Stack>
+          <AssignmentFilters
+            query={query}
+            setQuery={setQuery}
+            courseFilter={courseFilter}
+            setCourseFilter={setCourseFilter}
+            statusFilter={statusFilter}
+            setStatusFilter={setStatusFilter}
+            sortOrder={sortOrder}
+            setSortOrder={setSortOrder}
+            courseOptions={courseOptions}
+            filtersActive={filtersActive}
+            clearFilters={clearFilters}
+          />
 
           <Divider sx={{ my: 1.5 }} />
 
-          {items.length === 0 ? (
-            <Typography color="text.secondary">No assignments yet.</Typography>
-          ) : filtered.length === 0 ? (
-            <Typography color="text.secondary">
-              No results. Try clearing filters or changing your search.
-            </Typography>
-          ) : isMobile ? (
-            <Stack spacing={1.5}>
-              {filtered.map((a) => {
-                const dueLocal = DateTime.fromISO(a.dueISO).setZone(TZ);
-                return (
-                  <Card key={a.id} variant="outlined" sx={{ borderRadius: 3 }}>
-                    <CardContent>
-                      <Stack direction="row" justifyContent="space-between" alignItems="start">
-                        <Box sx={{ pr: 1 }}>
-                          <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-                            {a.title}
-                          </Typography>
-                          <Typography variant="body2" color="text.secondary">
-                            {a.course || "No course"}
-                          </Typography>
-                        </Box>
-                        {dueChip(a.dueISO)}
-                      </Stack>
-
-                      <Typography sx={{ mt: 1 }} variant="body2">
-                        <strong>Due:</strong> {dueLocal.toFormat("ccc, LLL d · h:mm a")}
-                      </Typography>
-
-                      {a.notes ? (
-                        <Typography sx={{ mt: 1 }} variant="body2" color="text.secondary">
-                          {a.notes}
-                        </Typography>
-                      ) : null}
-                    </CardContent>
-
-                    <CardActions sx={{ justifyContent: "space-between", px: 2, pb: 1.5 }}>
-                      <Button
-                        size="small"
-                        endIcon={<OpenInNewIcon />}
-                        onClick={() =>
-                          window.open(toGoogleCalendarUrl(a), "_blank", "noopener,noreferrer")
-                        }
-                      >
-                        Add to Google
-                      </Button>
-
-                      <Box>
-                        <IconButton aria-label="edit" onClick={() => startEdit(a)}>
-                          <EditIcon />
-                        </IconButton>
-                        <IconButton aria-label="delete" onClick={() => remove(a.id)}>
-                          <DeleteIcon />
-                        </IconButton>
-                      </Box>
-                    </CardActions>
-                  </Card>
-                );
-              })}
-            </Stack>
-          ) : (
-            <Table size="small">
-              <TableHead>
-                <TableRow>
-                  <TableCell>Course</TableCell>
-                  <TableCell>Title</TableCell>
-                  <TableCell>Due (Toronto)</TableCell>
-                  <TableCell>Notes</TableCell>
-                  <TableCell align="right">Actions</TableCell>
-                </TableRow>
-              </TableHead>
-
-              <TableBody>
-                {filtered.map((a) => {
-                  const dueLocal = DateTime.fromISO(a.dueISO).setZone(TZ);
-                  return (
-                    <TableRow key={a.id}>
-                      <TableCell>{a.course || "-"}</TableCell>
-                      <TableCell>
-                        <Stack direction="row" spacing={1} alignItems="center">
-                          <Typography variant="body2">{a.title}</Typography>
-                          {dueChip(a.dueISO)}
-                        </Stack>
-                      </TableCell>
-                      <TableCell>{dueLocal.toFormat("ccc, LLL d, yyyy · h:mm a")}</TableCell>
-                      <TableCell
-                        sx={{
-                          maxWidth: 320,
-                          whiteSpace: "nowrap",
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                        }}
-                        title={a.notes || ""}
-                      >
-                        {a.notes || "-"}
-                      </TableCell>
-                      <TableCell align="right">
-                        <Button
-                          size="small"
-                          endIcon={<OpenInNewIcon />}
-                          onClick={() =>
-                            window.open(toGoogleCalendarUrl(a), "_blank", "noopener,noreferrer")
-                          }
-                          sx={{ mr: 1 }}
-                        >
-                          Add to Google
-                        </Button>
-                        <IconButton aria-label="edit" onClick={() => startEdit(a)}>
-                          <EditIcon />
-                        </IconButton>
-                        <IconButton aria-label="delete" onClick={() => remove(a.id)}>
-                          <DeleteIcon />
-                        </IconButton>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          )}
+          <AssignmentList
+            itemsCount={items.length}
+            filtered={filtered}
+            isMobile={isMobile}
+            dueChip={dueChip}
+            onEdit={startEdit}
+            onDelete={remove}
+            toGoogleCalendarUrl={toGoogleCalendarUrl}
+          />
         </Paper>
       </Container>
 
-      {/* Error popup */}
       <Snackbar
         open={snack.open}
         autoHideDuration={3000}
