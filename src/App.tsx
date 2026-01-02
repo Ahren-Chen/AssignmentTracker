@@ -56,7 +56,7 @@ function toGoogleCalendarUrl(a: Assignment) {
 export default function App() {
   const isMobile = useMediaQuery("(max-width:600px)");
 
-  const [items, setItems] = useState<Assignment[]>([]);
+  const [items, setItems] = useState<Assignment[]>(() => loadAssignments());
   const [editingId, setEditingId] = useState<string | null>(null);
 
   // form state
@@ -105,7 +105,6 @@ export default function App() {
   }
 
   // load/save
-  useEffect(() => setItems(loadAssignments()), []);
   useEffect(() => saveAssignments(items), [items]);
 
   const filtered = useMemo(() => {
