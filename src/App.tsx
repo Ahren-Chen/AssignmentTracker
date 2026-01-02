@@ -9,6 +9,8 @@ import {
   Divider,
   Paper,
   Snackbar,
+  Tab,
+  Tabs,
   Toolbar,
   Typography,
   useMediaQuery,
@@ -24,6 +26,7 @@ import AssignmentForm from "./components/AssignmentForm";
 import AssignmentFilters from "./components/AssignmentFilters";
 import type { SortOrder, StatusFilter } from "./components/AssignmentFilters";
 import AssignmentList from "./components/AssignmentList";
+import PlanView from "./components/PlansView";
 
 const TZ = "America/Toronto";
 
@@ -58,6 +61,8 @@ export default function App() {
 
   const [items, setItems] = useState<Assignment[]>(() => loadAssignments());
   const [editingId, setEditingId] = useState<string | null>(null);
+
+  const [tab, setTab] = useState<"TRACKER" | "PLAN">("TRACKER");
 
   // form state
   const [course, setCourse] = useState("");
@@ -231,6 +236,17 @@ export default function App() {
             Assignment Tracker
           </Typography>
 
+          <Tabs
+            value={tab}
+            onChange={(_, v) => setTab(v)}
+            textColor="inherit"
+            indicatorColor="secondary"
+            sx={{ minHeight: 48 }}
+          >
+            <Tab value="TRACKER" label="Tracker" sx={{ minHeight: 48 }} />
+            <Tab value="PLAN" label="Plan" sx={{ minHeight: 48 }} />
+          </Tabs>
+
           <Button
             color="inherit"
             startIcon={<DownloadIcon />}
@@ -253,55 +269,61 @@ export default function App() {
       </AppBar>
 
       <Container maxWidth="md" sx={{ py: { xs: 2, sm: 4 } }}>
-        <AssignmentForm
-          isMobile={isMobile}
-          itemsCount={items.length}
-          editingId={editingId}
-          course={course}
-          setCourse={setCourse}
-          title={title}
-          setTitle={setTitle}
-          due={due}
-          setDue={setDue}
-          notes={notes}
-          setNotes={setNotes}
-          titleTouched={titleTouched}
-          setTitleTouched={setTitleTouched}
-          onSubmit={onSubmit}
-          resetForm={resetForm}
-          exportICS={exportICS}
-          exportDisabled={items.length === 0}
-        />
+        {tab === "PLAN" ? (
+          <PlanView items={items} />
+        ) : (
+          <>
+            <AssignmentForm
+              isMobile={isMobile}
+              itemsCount={items.length}
+              editingId={editingId}
+              course={course}
+              setCourse={setCourse}
+              title={title}
+              setTitle={setTitle}
+              due={due}
+              setDue={setDue}
+              notes={notes}
+              setNotes={setNotes}
+              titleTouched={titleTouched}
+              setTitleTouched={setTitleTouched}
+              onSubmit={onSubmit}
+              resetForm={resetForm}
+              exportICS={exportICS}
+              exportDisabled={items.length === 0}
+            />
 
-        <Box sx={{ height: { xs: 14, sm: 20 } }} />
+            <Box sx={{ height: { xs: 14, sm: 20 } }} />
 
-        <Paper sx={{ p: { xs: 2, sm: 3 }, borderRadius: 3 }}>
-          <AssignmentFilters
-            query={query}
-            setQuery={setQuery}
-            courseFilter={courseFilter}
-            setCourseFilter={setCourseFilter}
-            statusFilter={statusFilter}
-            setStatusFilter={setStatusFilter}
-            sortOrder={sortOrder}
-            setSortOrder={setSortOrder}
-            courseOptions={courseOptions}
-            filtersActive={filtersActive}
-            clearFilters={clearFilters}
-          />
+            <Paper sx={{ p: { xs: 2, sm: 3 }, borderRadius: 3 }}>
+              <AssignmentFilters
+                query={query}
+                setQuery={setQuery}
+                courseFilter={courseFilter}
+                setCourseFilter={setCourseFilter}
+                statusFilter={statusFilter}
+                setStatusFilter={setStatusFilter}
+                sortOrder={sortOrder}
+                setSortOrder={setSortOrder}
+                courseOptions={courseOptions}
+                filtersActive={filtersActive}
+                clearFilters={clearFilters}
+              />
 
-          <Divider sx={{ my: 1.5 }} />
+              <Divider sx={{ my: 1.5 }} />
 
-          <AssignmentList
-            itemsCount={items.length}
-            filtered={filtered}
-            isMobile={isMobile}
-            dueChip={dueChip}
-            onEdit={startEdit}
-            onDelete={remove}
-            toGoogleCalendarUrl={toGoogleCalendarUrl}
-          />
-        </Paper>
+              <AssignmentList
+                itemsCount={items.length}
+                filtered={filtered}
+                isMobile={isMobile}
+                dueChip={dueChip}
+                onEdit={startEdit}
+                onDelete={remove}
+                toGoogleCalendarUrl={toGoogleCalendarUrl}
+              />
+            </Paper>
+          </>
+        )}
       </Container>
 
       <Snackbar
