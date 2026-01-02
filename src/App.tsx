@@ -63,6 +63,7 @@ export default function App() {
   const [editingId, setEditingId] = useState<string | null>(null);
 
   const [tab, setTab] = useState<"TRACKER" | "PLAN">("TRACKER");
+  const [estimateHours, setEstimateHours] = useState<string>("1");
 
   // form state
   const [course, setCourse] = useState("");
@@ -157,6 +158,7 @@ export default function App() {
     setTitle("");
     setDue(DateTime.now().setZone(TZ));
     setNotes("");
+    setEstimateHours("1");
     setTitleTouched(false);
   }
 
@@ -172,6 +174,13 @@ export default function App() {
       return;
     }
 
+    const hours = Number(estimateHours);
+    if (!Number.isFinite(hours) || hours <= 0) {
+      showError("Estimated hours must be a positive number.");
+      return;
+    }
+    const estimateMinutes = Math.round(hours * 60);
+
     const dueISO = due.setZone(TZ).toISO();
     if (!dueISO) {
       showError("Invalid due date. Please pick again.");
@@ -182,7 +191,14 @@ export default function App() {
       setItems((prev) =>
         prev.map((x) =>
           x.id === editingId
-            ? { ...x, course: course.trim(), title: title.trim(), dueISO, notes: notes.trim() }
+            ? {
+                ...x,
+                course: course.trim(),
+                title: title.trim(),
+                dueISO,
+                notes: notes.trim(),
+                estimateMinutes,
+              }
             : x
         )
       );
@@ -193,6 +209,7 @@ export default function App() {
         title: title.trim(),
         dueISO,
         notes: notes.trim(),
+        estimateMinutes,
       };
       setItems((prev) => [newItem, ...prev]);
     }
@@ -206,6 +223,7 @@ export default function App() {
     setTitle(a.title ?? "");
     setDue(DateTime.fromISO(a.dueISO).setZone(TZ));
     setNotes(a.notes ?? "");
+    setEstimateHours(String(((a.estimateMinutes ?? 60) / 60).toFixed(1)).replace(/\.0$/, ""));
     setTitleTouched(false);
   }
 
@@ -268,7 +286,7 @@ export default function App() {
         </Toolbar>
       </AppBar>
 
-      <Container maxWidth="md" sx={{ py: { xs: 2, sm: 4 } }}>
+      <Container maxWidth="lg" sx={{ py: { xs: 2, sm: 4 } }}>
         {tab === "PLAN" ? (
           <PlanView items={items} />
         ) : (
@@ -291,6 +309,8 @@ export default function App() {
               resetForm={resetForm}
               exportICS={exportICS}
               exportDisabled={items.length === 0}
+              estimateHours={estimateHours}
+              setEstimateHours={setEstimateHours}
             />
 
             <Box sx={{ height: { xs: 14, sm: 20 } }} />

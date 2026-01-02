@@ -4,6 +4,7 @@ import {
   Card,
   CardActions,
   CardContent,
+  Chip,
   IconButton,
   Stack,
   Table,
@@ -56,6 +57,8 @@ export default function AssignmentList(props: Props) {
       <Stack spacing={1.5}>
         {filtered.map((a) => {
           const dueLocal = DateTime.fromISO(a.dueISO).setZone(TZ);
+          const estHrs = ((a.estimateMinutes ?? 60) / 60).toFixed(1).replace(/\.0$/, "");
+
           return (
             <Card key={a.id} variant="outlined" sx={{ borderRadius: 3 }}>
               <CardContent>
@@ -74,6 +77,11 @@ export default function AssignmentList(props: Props) {
                 <Typography sx={{ mt: 1 }} variant="body2">
                   <strong>Due:</strong> {dueLocal.toFormat("ccc, LLL d · h:mm a")}
                 </Typography>
+
+                <Stack direction="row" spacing={1} sx={{ mt: 1 }} alignItems="center" flexWrap="wrap">
+                    <Chip size="small" label={`Due ${dueLocal.toFormat("LLL d · h:mm a")}`} variant="outlined" />
+                    <Chip size="small" label={`${estHrs}h`} variant="outlined" />
+                </Stack>
 
                 {a.notes ? (
                   <Typography sx={{ mt: 1 }} variant="body2" color="text.secondary">
@@ -115,26 +123,42 @@ export default function AssignmentList(props: Props) {
           <TableCell>Title</TableCell>
           <TableCell>Due (Toronto)</TableCell>
           <TableCell>Notes</TableCell>
-          <TableCell align="right">Actions</TableCell>
+          <TableCell align="center">Actions</TableCell>
         </TableRow>
       </TableHead>
 
       <TableBody>
         {filtered.map((a) => {
           const dueLocal = DateTime.fromISO(a.dueISO).setZone(TZ);
+          const estHrs = ((a.estimateMinutes ?? 60) / 60).toFixed(2).replace(/\.0$/, "");
           return (
             <TableRow key={a.id}>
               <TableCell>{a.course || "-"}</TableCell>
-              <TableCell>
-                <Stack direction="row" spacing={1} alignItems="center">
-                  <Typography variant="body2">{a.title}</Typography>
-                  {dueChip(a.dueISO)}
+              <TableCell sx={{ maxWidth: 380 }}>
+                <Stack direction="row" spacing={1} alignItems="center" sx={{ minWidth: 0, flexWrap: "nowrap" }}>
+                    <Typography
+                    variant="body2"
+                    sx={{
+                        minWidth: 0,
+                        maxWidth: 180,
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                    }}
+                    title={a.title}
+                    >
+                    {a.title}
+                    </Typography>
+
+                    {dueChip(a.dueISO)}
+                    <Chip size="small" label={`${estHrs}h`} variant="outlined" />
                 </Stack>
               </TableCell>
+
               <TableCell>{dueLocal.toFormat("ccc, LLL d, yyyy · h:mm a")}</TableCell>
               <TableCell
                 sx={{
-                  maxWidth: 320,
+                  maxWidth: 220,
                   whiteSpace: "nowrap",
                   overflow: "hidden",
                   textOverflow: "ellipsis",
@@ -144,20 +168,23 @@ export default function AssignmentList(props: Props) {
                 {a.notes || "-"}
               </TableCell>
               <TableCell align="right">
-                <Button
-                  size="small"
-                  endIcon={<OpenInNewIcon />}
-                  onClick={() => window.open(toGoogleCalendarUrl(a), "_blank", "noopener,noreferrer")}
-                  sx={{ mr: 1 }}
-                >
-                  Add to Google
-                </Button>
-                <IconButton aria-label="edit" onClick={() => onEdit(a)}>
-                  <EditIcon />
-                </IconButton>
-                <IconButton aria-label="delete" onClick={() => onDelete(a.id)}>
-                  <DeleteIcon />
-                </IconButton>
+                <Stack direction="row" spacing={1} alignItems="center" justifyContent="flex-end">
+                    <Button
+                    size="small"
+                    endIcon={<OpenInNewIcon />}
+                    onClick={() => window.open(toGoogleCalendarUrl(a), "_blank", "noopener,noreferrer")}
+                    >
+                    Add to Google
+                    </Button>
+
+                    <IconButton aria-label="edit" onClick={() => onEdit(a)}>
+                    <EditIcon />
+                    </IconButton>
+
+                    <IconButton aria-label="delete" onClick={() => onDelete(a.id)}>
+                    <DeleteIcon />
+                    </IconButton>
+                </Stack>
               </TableCell>
             </TableRow>
           );

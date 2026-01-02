@@ -1,7 +1,9 @@
 export type Assignment = {
   id: string;
-  course: string;
+  course?: string;
   title: string;
-  dueISO: string; // ISO string
+  dueISO: string;
   notes?: string;
+
+  estimateMinutes?: number;
 };

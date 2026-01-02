@@ -27,6 +27,9 @@ type Props = {
   resetForm: () => void;
   exportICS: () => void;
   exportDisabled: boolean;
+
+  estimateHours: string;
+  setEstimateHours: (v: string) => void;
 };
 
 const TZ = "America/Toronto";
@@ -50,6 +53,8 @@ export default function AssignmentForm(props: Props) {
     resetForm,
     exportICS,
     exportDisabled,
+    estimateHours,
+    setEstimateHours,
   } = props;
 
   return (
@@ -65,22 +70,32 @@ export default function AssignmentForm(props: Props) {
         </Stack>
 
         <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
-          <TextField
-            label="Course (optional)"
-            value={course}
-            onChange={(e) => setCourse(e.target.value)}
-            fullWidth
-          />
-          <TextField
-            label="Title"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            onBlur={() => setTitleTouched(true)}
-            fullWidth
-            required
-            error={titleTouched && !title.trim()}
-            helperText={titleTouched && !title.trim() ? "Title cannot be blank." : " "}
-          />
+            <TextField
+                label="Course (optional)"
+                value={course}
+                onChange={(e) => setCourse(e.target.value)}
+                fullWidth
+            />
+
+            <TextField
+                label="Title"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                onBlur={() => setTitleTouched(true)}
+                fullWidth
+                required
+                error={titleTouched && !title.trim()}
+                helperText={titleTouched && !title.trim() ? "Title cannot be blank." : " "}
+            />
+
+            <TextField
+                label="Est. hours"
+                value={estimateHours}
+                onChange={(e) => setEstimateHours(e.target.value)}
+                type="number"
+                inputProps={{ min: 0.25, step: 0.25 }}
+                fullWidth
+            />
         </Stack>
 
         <DateTimePicker
